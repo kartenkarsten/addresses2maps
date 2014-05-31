@@ -1,0 +1,27 @@
+clear-map 
+
+// map settings
+set-setting name=map.decoration.scale value=false
+set-setting name=map.decoration.grid value=false
+
+set-geo-bounds $bbox
+set-print-bounds-geo $bbox
+
+// TODO change this path
+use-ruleset location=/home/karsten/workspace/projekte/osm/Maperitive/rules/wireframe_remix.mrules
+
+//load-source "/tmp/bergen.osm"
+
+download-osm-overpass
+
+apply-ruleset
+zoom-bounds
+
+//add-web-map provider="stamen.watercolor"
+
+// export fails! 
+// set print bounds manually 
+// and type this command by hand
+//export-svg compatibility=inkscape zoom=17 file=/tmp/$name.svg
+export-svg compatibility=inkscape file=/tmp/$name.svg
+export-bitmap width=2362 file=/tmp/$name.png
