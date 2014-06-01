@@ -1,24 +1,42 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
-# uses geocoder, pycarddav
 from string import Template
-import geocoder
-import vobject
-import StringIO
-import sys
-#import models
+import sys, getopt
+import os.path
+import re
 
-class Contact:
-    def __init__(self, name, position):
-        self.name = name
-        self.position = position
-#        self.streetAndNumber = None
-#        self.contry = None
-#        self.city = None
-#        self.postcode = None
+import geocoder
+class Address:
+    def __init__(self, country, postcode, city, street, housenumber):
+        self.country = country
+        if country=='' or country == None:
+            self.country = "Deutschland"
+
+        self.postcode = postcode
+        self.city = city
+        self.street = street
+        self.housenumber = housenumber
 
     def toString(self):
-        return self.name+" is from "+self.position.toString()
+        string = self.country
+        if self.postcode != '' and self.postcode != None:
+            string += ", "+str(self.postcode)
+        if self.city != '' and self.city != None:
+            string += ", "+str(self.city)
+        if self.street != '' and self.street != None:
+            string += ", "+str(self.street)
+        if self.housenumber != '' and self.housenumber != None:
+            string += ", "+str(self.housenumber)
+        #return self.country+", "+str(self.postcode)+", "+self.city+", "+self.street+" "+str(self.housenumber)
+        return string
+
+    def lookupPosition(self):
+        #g = geocoder.osm('Deutschland, 21379, Scharnebeck, Hülsenberg 6')
+        print self.toString()
+        g = geocoder.osm(self.toString())
+        if (g.x == None)or(g.y == None):
+            raise NameError("can't get lon/lat -> check your internet connection")
+        return Position(g.x, g.y)
 
 class Position:
     def __init__(self, lon, lat):
@@ -38,93 +56,247 @@ class Position:
         right = self.lon+width/2
         return str(left)+","+str(bottom)+","+str(right)+","+str(top)
 
-def getPosition(search):
-    #g = geocoder.osm('Deutschland, 21379, Scharnebeck, Hülsenberg 6')
-    g = geocoder.osm(search)
-    #print g
-    return Position(g.x, g.y)
+class Contact:
+    def __init__(self, name, position, address):
+        self.name = name
 
-def getAddr(vcard):
-    try:
-        print vcard.adr.value,"\n"
-    except:
-        print "fail"
+        # if no position is given - use the address to look one up
+        if (position == None):
+            print "has to lookup the address to get a gps position"
+            self.position = address.lookupPosition()
+        else:
+            self.position = position
+        self.address = address
 
-#def openFile(location):
-#    try:
-#        f = open(location, 'r')
-#        return f
-#    except:
-#        print "Error opening the file"
+    def toString(self):
+        return self.name+" is from "+self.position.toString()
 
-def getFileContent(fd):
-    return fd.readlines()
+    def getPosition(self):
+        return self.position
 
-def parseVcf(vcfStr):
-    count = 0
-    vcards_per_file = 0
-    for line in vcfStr:
-        if ("BEGIN:VCARD" in line):
-            count += 1
-        if (count <= vcards_per_file):
-            results.append(line)
 
-def createScript(contact):
+
+
+def createSingleContactRule(contact):
+    """
+    creates a specific render rule to highlight the contact address building
+    """
+    filterTemplate = '(addr:housenumber=$housenumber AND addr:street="$street")'
+    t = Template(filterTemplate)
+    filter = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
+
+    file = "template.mrules"
+    t = Template(open(file).read())
+    new = t.substitute(filter=filter)
+    out = open(contact.name+".mrules", "w+").write(new)
+
+def initFilter(contact):
+    """
+    starts a filtering statement, to highlight multiple addresses
+    """
+    filterTemplate = '(addr:housenumber=$housenumber AND addr:street="$street")'
+    t = Template(filterTemplate)
+    new = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
+    out = open("temp.filter_mrules", "w+").write(new)
+
+def addFilter(contact):
+    """
+    adds an address to a filtering statement, to highlight multiple addresses
+    """
+    filterTemplate = ' OR (addr:housenumber=$housenumber AND addr:street="$street")'
+    t = Template(filterTemplate)
+    new = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
+    out = open("temp.filter_mrules", "a").write(new)
+
+def finishMultiContactRule(rulename):
+    file = "template.mrules"
+    filter = open("temp.filter_mrules").read()
+    t = Template(open(file).read())
+    new = t.substitute(filter=filter)
+    out = open(rulename+".mrule", "w+").write(new)
+    #delete temporaty file
+    os.remove("temp.filter_mrules")
+
+
+def createSingleContactScript(contact):
     file = "template.mscript"
     t = Template(open(file).read())
-#    template = open(file, "r").read()
-#    template.replace("$$$bbox$$$", contact.position.toBbox)
-#    template.replace("$$$name$$$", contact.name)
-    new = t.substitute(bbox= contact.position.toBbox(), name=contact.name)
+    new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name)
     out = open(contact.name+".mscript", "w+").write(new)
-    return
+
+def addToScript(scriptName, ruleName, contact):
+    file = "template.mscript"
+    t = Template(open(file).read())
+    new = t.substitute(bbox= contact.position.toBbox(),rulename=ruleName, name=contact.name)
+    out = open(filename+".mscript", "a+").write(new)
 
 def main(argv):
     p = Position(10.4951302,53.2929971)
-    if (len(sys.argv) < 2):
-        print "ERROR: too less parameter"
-        return
-    name = sys.argv[1]
-    search = sys.argv[2]
+
+#TODO parse name + addr parameter with getopt
+    name = "Karsten"
+    country = "Deutschland"
+    postcode = "21379"
+    city = "Scharnebeck"
+    street = "Hülsenberg"
+    housenumber = "6"
+
+    finishFlag=False;
+    multipleFlag=False;
+
+    try:
+        opts, args = getopt.getopt(argv,"?n:cp:i:s:h:fm",["name=","country=","postcode=","city=","street=","housenumber=","finish", "multiple"])
+    except getopt.GetoptError:
+        print 'main.py -n <name> -c <country> -p <postcode> -i <city> -s <street> -h <housenumber> [-?]'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-?':
+            print 'main.py -n <name> -c <country> -p <postcode> -i <city> -s <street> -h <housenumber>'
+            print '        [-m [-f] ]'
+            print ' no real address data is needed for use with -f'
+            sys.exit()
+        elif opt in ("-n", "--name"):
+            name = arg
+        elif opt in ("-c", "--country"):
+            country = arg
+        elif opt in ("-p", "--postcode"):
+            postcode = arg
+        elif opt in ("-i", "--city"):
+            city = arg
+        elif opt in ("-s", "--street"):
+            street = arg
+        elif opt in ("-h", "--housenumber"):
+            housenumber = arg
+        elif opt in ("-f", "--finish"):
+            finishFlag = True
+        elif opt in ("-m", "--multiple"):
+            multipleFlag = True
+
     print "Processing data for "+name
-    #location = getPosition(search)
-    location = p
-    c = Contact(name, location)
+
+    addr = Address(country, postcode, city, street, housenumber)
+
+    c = Contact(name, None, addr)
     print c.toString()
-    createScript(c)
-    print location.toString()
-    print location.toBbox()
 
-#    print "Vcard 2 lon lat"
-#    card = "card.vcf"
-#    vcards = dict()
-#    fcard = open(card, "r")
-#    try:
-#        for vcard in vobject.readComponents(fcard):
-#            name = vcard.fn.value
-#            vcards[name] = vcard
-#    except Exception, v:
-#        print >> sys.stderr, "Warning, %s: %s" % (card, v)
-#        fcard.close()
-#        return
-#    fcard.close()
-#
-#    for (name, vcard) in vcards.items():
-#        print "->",name
-#        getAddr(vcard)
-#        print "\n"
+    if (multipleFlag == False):
+        createSingleContactRule(c)
+        print "render rule created"
+        createSingleContactScript(c)
+        print "render script created"
+    else:
+        multiRuleName = "Contacts.mrule"
+        multiScriptName = "Contacts.mscript"
+        if (finishFlag == True):
+            finishMultiContactRule(multiRuleName)
+        elif (os.path.exists("temp.filter_mrules")):
+            addFilter(c)
+            print "added filter for "+c.name
+            addToScript(multiScriptName,multiRuleName, c)
+            print "added "+c.name+" to render script"
+        else:
+            initFilter(c)
+            print "initicialize filter with "+c.name
+            addToScript(multiScriptName,multiRuleName, c)
+            print "added "+c.name+" to render script"
 
-#with open('Contacts.vcf', 'r') as content_file:
-#    content = content_file.read()
-#
-#f = StringIO.StringIO(content)
-#v = vobject.readOne( content )
-#
-##v2 = vobject.readComponents(f).next()
-##print v2.component
-#for v3 in vobject.readComponents(f):
-#    getAddr(v3)
-##v.prettyPrint()
 
-if __name__ == "__main__":
-   main(sys.argv[1:])
+def getFirstHomeAddressFromRaw(text):
+    pattern = re.compile('(?<=\nADR;TYPE=home:).*')
+    match = pattern.search(text)
+    if match:
+        adrRaw = match.group(0).split(';')
+        print adrRaw
+        city = adrRaw[3]
+        street = adrRaw[2]
+        number = None
+        try:
+            street, number = street.rsplit(" ",1)
+        except:
+            number = None
+        adr = Address(adrRaw[6],adrRaw[5],adrRaw[3],street,number)
+        return adr
+    return None
+
+def getPreNameFromRaw(text):
+    pattern = re.compile('(?<=\nN:).*')
+    match = pattern.search(text)
+    if match:
+        #extracts the prename name
+        return match.group(0).split(';')[1]
+    return ""
+
+def precheckContainsCategory(text,category):
+    pattern = re.compile('\nCATEGORIES:.*'+category)
+    match = pattern.search(text)
+    if match:
+        return True
+    return False
+
+def processMultiVCard(filename):
+    finishFlag = False
+
+    vCardFile = open(filename, 'r')
+
+    idx = 0
+    count = 0
+    vcardStarted = False
+    vcardBuffer = ""
+    while True:
+        line = vCardFile.readline()
+        if not line:
+            break
+
+        if line.startswith('BEGIN:VCARD'):
+            vcardStarted = True
+            idx = idx + 1
+            vcardBuffer = ""
+
+        if vcardStarted:
+            vcardBuffer += line
+
+        if line.startswith('END:VCARD'):
+            vcardStarted = False
+            if precheckContainsCategory(vcardBuffer, 'Gast'):
+                count = count + 1
+                print "read vcard no: "+str(idx) + " gast count: "+str(count)
+                print vcardBuffer
+
+                name = getPreNameFromRaw(vcardBuffer)
+                adr = getFirstHomeAddressFromRaw(vcardBuffer)
+                try:
+                    c = Contact(name, None, adr)
+                except:
+                    count = count -1
+                    #TODO write fail log
+                    print >> sys.stderr, "ERROR: no location for "+name
+                    continue
+
+                #log position:
+                open("posdb","a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
+
+                multiRuleName = "Contacts.mrule"
+                multiScriptName = "Contacts.mscript"
+                if (finishFlag == True):
+                    finishMultiContactRule(multiRuleName)
+                elif (os.path.exists("temp.filter_mrules")):
+                    addFilter(c)
+                    print "added filter for "+c.name
+                    addToScript(multiScriptName,multiRuleName, c)
+                    print "added "+c.name+" to render script"
+                else:
+                    initFilter(c)
+                    print "initicialize filter with "+c.name
+                    addToScript(multiScriptName,multiRuleName, c)
+                    print "added "+c.name+" to render script"
+
+    vCardFile.close()
+    print '\nused ' + str(idx) + ' vCards';
+
+#c = open("card.vcf").read()
+filename = "Contacts.vcf"
+#filename = "card.vcf"
+processMultiVCard(filename)
+
+#if __name__ == "__main__":
+#   main(sys.argv[1:])
