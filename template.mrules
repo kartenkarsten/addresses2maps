@@ -145,7 +145,7 @@ rules
 				text : [[addr:housenumber]]
 			draw : line
 			draw : fill
-			draw : text
+			//draw : text
 
 //	target : building with address
 //		if : building use*

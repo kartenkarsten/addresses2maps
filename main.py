@@ -6,6 +6,14 @@ import os.path
 import re
 
 import geocoder
+class Settings:
+    def __init__(self, vcardFileName, tempFilterRule, gpsCsvFileName, outputMRulesName, outputMScriptName ):
+        self.tempFilterRule = tempFilterRule
+        self.vcardFileName = vcardFileName
+        self.gpsCsvFileName = gpsCsvFileName
+        self.outputMScriptName = outputMScriptName
+        self.outputMRulesName = outputMRulesName
+
 class Address:
     def __init__(self, country, postcode, city, street, housenumber):
         self.country = country
@@ -16,6 +24,10 @@ class Address:
         self.city = city
         self.street = street
         self.housenumber = housenumber
+        if (street == '' or street == None):
+            print >> sys.stderr, "ERROR: street missing on Contact "+name
+        if (housenumber == '' or housenumber == None):
+            print >> sys.stderr, "ERROR: "+name+" has no housenumber!"
 
     def toString(self):
         string = self.country
@@ -75,9 +87,7 @@ class Contact:
         return self.position
 
 
-
-
-def createSingleContactRule(contact):
+def createSingleContactRule(contact,settings):
     """
     creates a specific render rule to highlight the contact address building
     """
@@ -88,124 +98,53 @@ def createSingleContactRule(contact):
     file = "template.mrules"
     t = Template(open(file).read())
     new = t.substitute(filter=filter)
-    out = open(contact.name+".mrules", "w+").write(new)
+    out = open(settings.outputMRulesName, "w+").write(new)
 
-def initFilter(contact):
+def initFilter(contact,settings):
     """
     starts a filtering statement, to highlight multiple addresses
     """
     filterTemplate = '(addr:housenumber=$housenumber AND addr:street="$street")'
     t = Template(filterTemplate)
     new = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
-    out = open("temp.filter_mrules", "w+").write(new)
+    out = open(settings.tempFilterRule, "w+").write(new)
 
-def addFilter(contact):
+def addFilter(contact,settings):
     """
     adds an address to a filtering statement, to highlight multiple addresses
     """
     filterTemplate = ' OR (addr:housenumber=$housenumber AND addr:street="$street")'
     t = Template(filterTemplate)
     new = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
-    out = open("temp.filter_mrules", "a").write(new)
+    out = open(settings.tempFilterRule, "a").write(new)
 
-def finishMultiContactRule(rulename):
+def finishMultiContactRule(settings):
     file = "template.mrules"
-    filter = open("temp.filter_mrules").read()
+    filter = open(settings.tempFilterRule).read()
     t = Template(open(file).read())
     new = t.substitute(filter=filter)
-    out = open(rulename+".mrule", "w+").write(new)
+    out = open(settings.outputMRulesName, "w+").write(new)
     #delete temporaty file
-    os.remove("temp.filter_mrules")
+    os.remove(settings.tempFilterRule)
 
 
-def createSingleContactScript(contact):
+def createSingleContactScript(contact,settings):
     file = "template.mscript"
     t = Template(open(file).read())
     new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name)
-    out = open(contact.name+".mscript", "w+").write(new)
+    out = open(settings.outputMScriptName, "w+").write(new)
 
-def addToScript(scriptName, ruleName, contact):
+def addToScript(contact, settings):
     file = "template.mscript"
     t = Template(open(file).read())
-    new = t.substitute(bbox= contact.position.toBbox(),rulename=ruleName, name=contact.name)
-    out = open(filename+".mscript", "a+").write(new)
-
-def main(argv):
-    p = Position(10.4951302,53.2929971)
-
-#TODO parse name + addr parameter with getopt
-    name = "Karsten"
-    country = "Deutschland"
-    postcode = "21379"
-    city = "Scharnebeck"
-    street = "Hülsenberg"
-    housenumber = "6"
-
-    finishFlag=False;
-    multipleFlag=False;
-
-    try:
-        opts, args = getopt.getopt(argv,"?n:cp:i:s:h:fm",["name=","country=","postcode=","city=","street=","housenumber=","finish", "multiple"])
-    except getopt.GetoptError:
-        print 'main.py -n <name> -c <country> -p <postcode> -i <city> -s <street> -h <housenumber> [-?]'
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt == '-?':
-            print 'main.py -n <name> -c <country> -p <postcode> -i <city> -s <street> -h <housenumber>'
-            print '        [-m [-f] ]'
-            print ' no real address data is needed for use with -f'
-            sys.exit()
-        elif opt in ("-n", "--name"):
-            name = arg
-        elif opt in ("-c", "--country"):
-            country = arg
-        elif opt in ("-p", "--postcode"):
-            postcode = arg
-        elif opt in ("-i", "--city"):
-            city = arg
-        elif opt in ("-s", "--street"):
-            street = arg
-        elif opt in ("-h", "--housenumber"):
-            housenumber = arg
-        elif opt in ("-f", "--finish"):
-            finishFlag = True
-        elif opt in ("-m", "--multiple"):
-            multipleFlag = True
-
-    print "Processing data for "+name
-
-    addr = Address(country, postcode, city, street, housenumber)
-
-    c = Contact(name, None, addr)
-    print c.toString()
-
-    if (multipleFlag == False):
-        createSingleContactRule(c)
-        print "render rule created"
-        createSingleContactScript(c)
-        print "render script created"
-    else:
-        multiRuleName = "Contacts.mrule"
-        multiScriptName = "Contacts.mscript"
-        if (finishFlag == True):
-            finishMultiContactRule(multiRuleName)
-        elif (os.path.exists("temp.filter_mrules")):
-            addFilter(c)
-            print "added filter for "+c.name
-            addToScript(multiScriptName,multiRuleName, c)
-            print "added "+c.name+" to render script"
-        else:
-            initFilter(c)
-            print "initicialize filter with "+c.name
-            addToScript(multiScriptName,multiRuleName, c)
-            print "added "+c.name+" to render script"
-
+    new = t.substitute(bbox= contact.position.toBbox(),rulename=str(settings.outputMRulesName), name=contact.name)
+    out = open(settings.outputMScriptName, "a+").write(new)
 
 def getFirstHomeAddressFromRaw(text):
     pattern = re.compile('(?<=\nADR;TYPE=home:).*')
     match = pattern.search(text)
     if match:
-        adrRaw = match.group(0).split(';')
+        adrRaw = match.group(0).strip("\r").split(';')
         print adrRaw
         city = adrRaw[3]
         street = adrRaw[2]
@@ -218,6 +157,16 @@ def getFirstHomeAddressFromRaw(text):
         return adr
     return None
 
+def getPositionFromRaw(text):
+    pattern = re.compile('(?<=\nGEO:).*')
+    match = pattern.search(text)
+    if match:
+        #extracts the prename name
+        array = match.group(0).strip("\r").split(',')
+        pos = Position(float(array[0]), float(array[1]))
+        return pos
+    return None
+
 def getPreNameFromRaw(text):
     pattern = re.compile('(?<=\nN:).*')
     match = pattern.search(text)
@@ -226,17 +175,41 @@ def getPreNameFromRaw(text):
         return match.group(0).split(';')[1]
     return ""
 
-def precheckContainsCategory(text,category):
+def containsCategory(text,category):
     pattern = re.compile('\nCATEGORIES:.*'+category)
     match = pattern.search(text)
     if match:
         return True
     return False
 
-def processMultiVCard(filename):
+def processSingleVCard(vcardText, settings):
+    name = getPreNameFromRaw(vcardText)
+    adr = getFirstHomeAddressFromRaw(vcardText)
+    geo = getPositionFromRaw(vcardText)
+    try:
+        c = Contact(name, geo, adr)
+    except:
+        #TODO write fail log
+        print >> sys.stderr, "ERROR: no location for "+name
+        return None
+
+    #log position:
+    open(settings.gpsCsvFileName,"a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
+
+    if (os.path.exists(settings.tempFilterRule)):
+        addFilter(c,settings)
+        print "added filter for "+c.name
+    else:
+        initFilter(c, settings)
+        print "initicialize filter with "+c.name
+
+    addToScript(c, settings)
+    print "added "+c.name+" to render script"
+
+def processMultiVCard(settings):
     finishFlag = False
 
-    vCardFile = open(filename, 'r')
+    vCardFile = open(settings.vcardFileName, 'r')
 
     idx = 0
     count = 0
@@ -257,46 +230,41 @@ def processMultiVCard(filename):
 
         if line.startswith('END:VCARD'):
             vcardStarted = False
-            if precheckContainsCategory(vcardBuffer, 'Gast'):
+            if containsCategory(vcardBuffer, 'Gast'):
                 count = count + 1
                 print "read vcard no: "+str(idx) + " gast count: "+str(count)
                 print vcardBuffer
+                processSingleVCard(vcardBuffer, settings)
 
-                name = getPreNameFromRaw(vcardBuffer)
-                adr = getFirstHomeAddressFromRaw(vcardBuffer)
-                try:
-                    c = Contact(name, None, adr)
-                except:
-                    count = count -1
-                    #TODO write fail log
-                    print >> sys.stderr, "ERROR: no location for "+name
-                    continue
-
-                #log position:
-                open("posdb","a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
-
-                multiRuleName = "Contacts.mrule"
-                multiScriptName = "Contacts.mscript"
-                if (finishFlag == True):
-                    finishMultiContactRule(multiRuleName)
-                elif (os.path.exists("temp.filter_mrules")):
-                    addFilter(c)
-                    print "added filter for "+c.name
-                    addToScript(multiScriptName,multiRuleName, c)
-                    print "added "+c.name+" to render script"
-                else:
-                    initFilter(c)
-                    print "initicialize filter with "+c.name
-                    addToScript(multiScriptName,multiRuleName, c)
-                    print "added "+c.name+" to render script"
 
     vCardFile.close()
     print '\nused ' + str(idx) + ' vCards';
 
-#c = open("card.vcf").read()
-filename = "Contacts.vcf"
-#filename = "card.vcf"
-processMultiVCard(filename)
 
-#if __name__ == "__main__":
-#   main(sys.argv[1:])
+def main(argv):
+
+    vcardfilename = ""
+
+    try:
+        opts, args = getopt.getopt(argv,"?f:",["help","vcardfile="])
+    except getopt.GetoptError:
+        print 'main.py -f <vcard-file> [-?]'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ('-?', "help"):
+            print 'main.py -f <vcard-file> [-?]'
+            sys.exit()
+        elif opt in ("-f", "--vcardfile"):
+            vcardfilename = arg
+
+    tempFileFilterRuleName = "temp.filter_rule"
+    gpsCsvFileName = "posdb"
+    outputMRulesName = str("Contacts.mrules")
+    outputMScriptName = str("Contacts.mscritp")
+    settings = Settings(vcardfilename,tempFileFilterRuleName, gpsCsvFileName, outputMRulesName, outputMScriptName)
+    print "Processing VCard "+settings.vcardFileName
+    processMultiVCard(settings)
+    finishMultiContactRule(settings)
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
