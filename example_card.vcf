@@ -1,0 +1,9 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Smith;John;;;
+FN:John Smith
+CATEGORIES:Gast,Work
+ADR;TYPE=home:;;Hauptstraße 13;Köln;;;
+REV:2014-01-25T20:07:37+00:00
+GEO:52.23903;9.95421
+END:VCARD

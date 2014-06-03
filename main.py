@@ -7,12 +7,15 @@ import re
 
 import geocoder
 class Settings:
-    def __init__(self, vcardFileName, tempFilterRule, gpsCsvFileName, outputMRulesName, outputMScriptName ):
+    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, outputMRulesName, outputMScriptName, outDir, logFile ):
         self.tempFilterRule = tempFilterRule
         self.vcardFileName = vcardFileName
+        self.outVCard = outVCard
         self.gpsCsvFileName = gpsCsvFileName
         self.outputMScriptName = outputMScriptName
         self.outputMRulesName = outputMRulesName
+        self.outDir = outDir
+        self.logFile = logFile
 
 class Address:
     def __init__(self, country, postcode, city, street, housenumber):
@@ -25,9 +28,11 @@ class Address:
         self.street = street
         self.housenumber = housenumber
         if (street == '' or street == None):
-            print >> sys.stderr, "ERROR: street missing on Contact "+name
+            self.street = None
+            print >> sys.stderr, "ERROR: Address has no street!"
         if (housenumber == '' or housenumber == None):
-            print >> sys.stderr, "ERROR: "+name+" has no housenumber!"
+            self.housenumber = None
+            print >> sys.stderr, "ERROR: Address has no housenumber!"
 
     def toString(self):
         string = self.country
@@ -56,12 +61,12 @@ class Position:
         self.lat = lat
 
     def toString(self):
-        return str(self.lat)+", "+ str(self.lon)
+        return str(self.lat)+";"+ str(self.lon)
 
     #def toBbox(self, width, height):
     def toBbox(self):
         width = 0.005
-        height = 0.0025
+        height = 0.0015
         top = self.lat+height/2
         bottom = self.lat-height/2
         left = self.lon-width/2
@@ -72,10 +77,15 @@ class Contact:
     def __init__(self, name, position, address):
         self.name = name
 
+        if address.housenumber is None or address.street is None:
+            raise NameError("can not use this address :"+address.toString)
+
         # if no position is given - use the address to look one up
         if (position == None):
             print "has to lookup the address to get a gps position"
             self.position = address.lookupPosition()
+            if self.position is None:
+                raise NameError("could not find coordinates to this address :"+address.toString)
         else:
             self.position = position
         self.address = address
@@ -131,13 +141,13 @@ def finishMultiContactRule(settings):
 def createSingleContactScript(contact,settings):
     file = "template.mscript"
     t = Template(open(file).read())
-    new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name)
+    new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name, outputDir=settings.outDir)
     out = open(settings.outputMScriptName, "w+").write(new)
 
 def addToScript(contact, settings):
     file = "template.mscript"
     t = Template(open(file).read())
-    new = t.substitute(bbox= contact.position.toBbox(),rulename=str(settings.outputMRulesName), name=contact.name)
+    new = t.substitute(bbox= contact.position.toBbox(),rulename=str(settings.outputMRulesName), name=contact.name, outputDir=settings.outDir)
     out = open(settings.outputMScriptName, "a+").write(new)
 
 def getFirstHomeAddressFromRaw(text):
@@ -162,10 +172,23 @@ def getPositionFromRaw(text):
     match = pattern.search(text)
     if match:
         #extracts the prename name
-        array = match.group(0).strip("\r").split(',')
+        array = match.group(0).strip("\r").split(';')
         pos = Position(float(array[0]), float(array[1]))
         return pos
     return None
+
+def setGeoToRaw(text, position):
+    #try search and replace
+    if (getPositionFromRaw is not None):
+        newText = re.sub('(?<=\nGEO:)((\-?\d+(\.\d+)?);\s*(\-?\d+(\.\d+)?))(?=\r?)', position.toString(), text)
+    else:
+        #get new line char
+        nl = "\n"
+        if re.search('(?<=\r\n)', text) is not None:
+            nl = "\r\n"
+        #insert it
+        newText = re.sub('(?<=\n)()(?=END:VCARD)', "GEO:"+position.toString()+nl, text)
+    return newText
 
 def getPreNameFromRaw(text):
     pattern = re.compile('(?<=\nN:).*')
@@ -190,9 +213,11 @@ def processSingleVCard(vcardText, settings):
         c = Contact(name, geo, adr)
     except:
         #TODO write fail log
-        print >> sys.stderr, "ERROR: no location for "+name
+        print >> sys.stderr, "ERROR: on parsing "+name+" incomlpete address or position lookup failed"
+        f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup faild ("+adr+")")
         return None
 
+    newVCardText = setGeoToRaw(vcardText, c.position)
     #log position:
     open(settings.gpsCsvFileName,"a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
 
@@ -205,6 +230,7 @@ def processSingleVCard(vcardText, settings):
 
     addToScript(c, settings)
     print "added "+c.name+" to render script"
+    return newVCardText
 
 def processMultiVCard(settings):
     finishFlag = False
@@ -234,34 +260,58 @@ def processMultiVCard(settings):
                 count = count + 1
                 print "read vcard no: "+str(idx) + " gast count: "+str(count)
                 print vcardBuffer
-                processSingleVCard(vcardBuffer, settings)
+                vcard = processSingleVCard(vcardBuffer, settings)
+                if vcard is not None:
+                    outFile = open(settings.outVCard, "a+").write(vcard)
 
 
     vCardFile.close()
     print '\nused ' + str(idx) + ' vCards';
 
+def usage():
+    print 'main.py -f <vcard-file> [-h]'
 
-def main(argv):
-
-    vcardfilename = ""
-
-    try:
-        opts, args = getopt.getopt(argv,"?f:",["help","vcardfile="])
-    except getopt.GetoptError:
-        print 'main.py -f <vcard-file> [-?]'
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt in ('-?', "help"):
-            print 'main.py -f <vcard-file> [-?]'
-            sys.exit()
-        elif opt in ("-f", "--vcardfile"):
-            vcardfilename = arg
-
+def getSettings():
     tempFileFilterRuleName = "temp.filter_rule"
     gpsCsvFileName = "posdb"
     outputMRulesName = str("Contacts.mrules")
-    outputMScriptName = str("Contacts.mscritp")
-    settings = Settings(vcardfilename,tempFileFilterRuleName, gpsCsvFileName, outputMRulesName, outputMScriptName)
+    outputMScriptName = str("Contacts.mscript")
+    outVCard = "out.vcf"
+    outDir = "/tmp/"#has to stop with /
+    logFile = "log"
+    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName, outputMRulesName, outputMScriptName, outDir, logFile)
+
+def main(argv):
+
+    try:
+        opts, args = getopt.getopt(argv,"hf:",["help","vcardfile="])
+    except getopt.GetoptError as err:
+        print str(err) # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
+
+    settings = getSettings()
+    for opt, arg in opts:
+        if opt in ('-?', "help",'-h'):
+            usage()
+            sys.exit()
+        elif opt in ("-f", "--vcardfile"):
+            settings.vcardFileName = arg
+        else:
+            assert False, "unhandled option"
+
+    if settings.vcardFileName is None:
+        print "No vcf File specified!"
+        usage()
+        sys.exit(2)
+
+
+    if os.path.exists(settings.outVCard):
+        os.remove(settings.outVCard)
+    if os.path.exists(settings.outVCard):
+        os.remove(settings.outVCard)
+
+
     print "Processing VCard "+settings.vcardFileName
     processMultiVCard(settings)
     finishMultiContactRule(settings)

@@ -156,7 +156,7 @@ rules
 
 	target : our target
 		define
-			line-style : solid
+			line-style : dash
 			line-width : 0.5
 			line-color : red
 			line-end-cap : square
@@ -166,14 +166,9 @@ rules
 			min-zoom : 15
 			text-halo-width : 2
 			fill-color : red
-			fill-hatch-color : white
+			fill-hatch-color : lime
 			fill-hatch : cross
 
-		if : *use*	
-			if : *residential
-				define
-					fill-hatch : swne
-		
 		draw : line
 		draw : fill
 

@@ -21,5 +21,5 @@ zoom-bounds
 // set print bounds manually 
 // and type this command by hand
 //export-svg compatibility=inkscape zoom=17 file=/tmp/$name.svg
-export-svg compatibility=inkscape file=/tmp/$name.svg
-export-bitmap width=2362 file=/tmp/$name.png
+export-svg compatibility=inkscape file=$outputDir$name.svg
+//export-bitmap width=2362 file=/tmp/$name.png
