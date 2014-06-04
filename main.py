@@ -4,6 +4,17 @@ from string import Template
 import sys, getopt
 import os.path
 import re
+#svg post processing
+from pysvg.filter import *
+from pysvg.gradient import *
+from pysvg.linking import *
+from pysvg.script import *
+from pysvg.shape import *
+from pysvg.structure import *
+from pysvg.style import *
+from pysvg.text import *
+from pysvg.builders import *
+import pysvg.parser
 
 import geocoder
 class Settings:
@@ -53,10 +64,10 @@ class Address:
         g = geocoder.osm(self.toString())
         if (g.x == None)or(g.y == None):
             raise NameError("can't get lon/lat -> check your internet connection")
-        return Position(g.x, g.y)
+        return Position(g.y, g.x)
 
 class Position:
-    def __init__(self, lon, lat):
+    def __init__(self, lat,lon):
         self.lon = lon
         self.lat = lat
 
@@ -86,6 +97,7 @@ class Contact:
             self.position = address.lookupPosition()
             if self.position is None:
                 raise NameError("could not find coordinates to this address :"+address.toString)
+            print self.position.toString()
         else:
             self.position = position
         self.address = address
@@ -140,14 +152,18 @@ def finishMultiContactRule(settings):
 
 def createSingleContactScript(contact,settings):
     file = "template.mscript"
+    osmGetDataCommand= "download-osm-overpass"
     t = Template(open(file).read())
-    new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name, outputDir=settings.outDir)
+    new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name, outputDir=settings.outDir, osmGetDataCommand=getDataCommand)
     out = open(settings.outputMScriptName, "w+").write(new)
 
 def addToScript(contact, settings):
     file = "template.mscript"
     t = Template(open(file).read())
-    new = t.substitute(bbox= contact.position.toBbox(),rulename=str(settings.outputMRulesName), name=contact.name, outputDir=settings.outDir)
+    #TODO put this in settings
+    getDataCommand= 'load-source "/home/karsten/workspace/projekte/osm/tischkarten/'+contact.position.toString()+'.osm"'
+    #osmGetDataCommand= "download-osm-overpass"
+    new = t.substitute(bbox= contact.position.toBbox(), rulename=str(settings.outputMRulesName), name=contact.name, outputDir=settings.outDir, osmGetDataCommand=getDataCommand)
     out = open(settings.outputMScriptName, "a+").write(new)
 
 def getFirstHomeAddressFromRaw(text):
@@ -217,6 +233,8 @@ def processSingleVCard(vcardText, settings):
         f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup faild ("+adr+")")
         return None
 
+    if not (os.path.exists(c.position.toString()+".osm")):
+        downloadOsmData(c.position.toBbox(),c.position.toString()+".osm")
     newVCardText = setGeoToRaw(vcardText, c.position)
     #log position:
     open(settings.gpsCsvFileName,"a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
@@ -268,6 +286,31 @@ def processMultiVCard(settings):
     vCardFile.close()
     print '\nused ' + str(idx) + ' vCards';
 
+def svgAddName(filename, name):
+    svg = pysvg.parser.parse(filename)
+    h = float(svg.get_height())
+    w = float(svg.get_width())
+    print h
+    oh = ShapeBuilder()
+    leftOffset = 40
+    charWidth = 20
+    gap = 13
+    #x1,y1,x2,y2
+    for i in range(len(name)):
+        svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
+    svg.save("/tmp/test.svg")
+
+def convertSvgToPng(filename):
+    #TODO use filename
+    os.system("inkscape -f /tmp/test.svg -z -e /tmp/test.png -w 1200 -h 600")
+
+def downloadOsmData(bboxOverpass,name):
+    print "toDo download from here"
+    print "http://overpass.osm.rambler.ru/cgi/interpreter?data=(node("+bboxOverpass+");rel(bn)->.x;way("+bboxOverpass+");node(w)->.x;rel(bw););out;"
+    server = "overpass.osm.rambler.ru/cgi/interpreter"
+    querry = "data=(node("+bboxOverpass+");rel(bn)->.x;way("+bboxOverpass+");node(w)->.x;rel(bw););out;"
+    os.system("wget -O '"+name+"' 'http://"+server+"?"+querry+"'")
+
 def usage():
     print 'main.py -f <vcard-file> [-h]'
 
@@ -308,6 +351,8 @@ def main(argv):
 
     if os.path.exists(settings.outVCard):
         os.remove(settings.outVCard)
+    if os.path.exists(settings.outputMScriptName):
+        os.remove(settings.outputMScriptName)
     if os.path.exists(settings.outVCard):
         os.remove(settings.outVCard)
 

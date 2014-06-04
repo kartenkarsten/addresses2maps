@@ -10,16 +10,9 @@ set-print-bounds-geo $bbox
 // TODO change this path
 use-ruleset location=/home/karsten/workspace/projekte/osm/tischkarten/$rulename
 
-download-osm-overpass
+$osmGetDataCommand
 
 apply-ruleset
 zoom-bounds
 
-//add-web-map provider="stamen.watercolor"
-
-// export fails! 
-// set print bounds manually 
-// and type this command by hand
-//export-svg compatibility=inkscape zoom=17 file=/tmp/$name.svg
 export-svg compatibility=inkscape file=$outputDir$name.svg
-//export-bitmap width=2362 file=/tmp/$name.png
