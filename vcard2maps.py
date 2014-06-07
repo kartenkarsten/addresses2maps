@@ -232,7 +232,11 @@ def processSingleVCard(vcardText, settings):
     except:
         #TODO write fail log
         print >> sys.stderr, "ERROR: on parsing "+name+" incomlpete address or position lookup failed"
-        f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup faild ("+adr+")")
+        try:
+            addrString = adr.toString()
+        except:
+            addrString = "None"
+        f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup faild ("+addrString+")\n")
         return None
 
     if not (os.path.exists(c.position.toString()+".osm")):
@@ -307,11 +311,12 @@ def convertSvgToPng(filename):
     os.system("inkscape -f /tmp/test.svg -z -e /tmp/test.png -w 1200 -h 600")
 
 def downloadOsmData(bboxOverpass,name):
-    print "toDo download from here"
-    print "http://overpass.osm.rambler.ru/cgi/interpreter?data=(node("+bboxOverpass+");rel(bn)->.x;way("+bboxOverpass+");node(w)->.x;rel(bw););out;"
-    server = "overpass.osm.rambler.ru/cgi/interpreter"
-    querry = "data=(node("+bboxOverpass+");rel(bn)->.x;way("+bboxOverpass+");node(w)->.x;rel(bw););out;"
-    os.system("wget -O '"+name+"' 'http://"+server+"?"+querry+"'")
+#    server = "overpass.osm.rambler.ru/cgi/interpreter"
+#    querry = "data=(node("+bboxOverpass+");rel(bn)->.x;way("+bboxOverpass+");node(w)->.x;rel(bw););out;"
+    querry = "http://overpass-api.de/api/map?bbox="+bboxOverpass
+    command = "wget -O '"+name+"' '"+querry+"'"
+    print command
+    os.system(command)
 
 def usage():
     print 'main.py -f <vcard-file> [-h]'
