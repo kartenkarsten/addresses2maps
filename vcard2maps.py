@@ -195,15 +195,17 @@ def getPositionFromRaw(text):
 
 def setGeoToRaw(text, position):
     #try search and replace
-    if (getPositionFromRaw is not None):
-        newText = re.sub('(?<=\nGEO:)((\-?\d+(\.\d+)?);\s*(\-?\d+(\.\d+)?))(?=\r?)', position.toString(), text)
-    else:
+    if (getPositionFromRaw(text) is None):
+        print "insert gps data"
         #get new line char
         nl = "\n"
         if re.search('(?<=\r\n)', text) is not None:
             nl = "\r\n"
         #insert it
         newText = re.sub('(?<=\n)()(?=END:VCARD)', "GEO:"+position.toString()+nl, text)
+    else:
+        print "update old gps data"
+        newText = re.sub('(?<=\nGEO:)((\-?\d+(\.\d+)?);\s*(\-?\d+(\.\d+)?))(?=\r?)', position.toString(), text)
     return newText
 
 def getPreNameFromRaw(text):
