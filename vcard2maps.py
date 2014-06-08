@@ -326,7 +326,7 @@ def svgAddName(filename, name):
 def convertSvgToPng(filename):
     #TODO use filename
     outfile,extension = filename.rsplit(".",1)
-    os.system("inkscape -f '"+filename+"' -z -e '"+outfile+".png' -w 1200 -h 600")
+    os.system("inkscape -f '"+filename+"' -z -e '"+outfile+".png' -w 1122 -h 531")
 
 def convertSvgsInDir(path):
     for file in os.listdir(path):
@@ -356,13 +356,14 @@ def convertPngsToPnggroups(path):
                 groupCount = groupCount + 1
                 pngs = []
 
-    outFile = "group_"+str(groupCount)+".png"
+    if len(pngs) != 0:
+        outFile = "group_"+str(groupCount)+".png"
 
-    #merge as well the last images to a big one
-    command = 'montage "'+('" "'.join(pngs))+'" -tile 2x5 -geometry +0+10 '+outFile
-    print command
-    os.system(command)
-    groups.append(outFile)
+        #merge as well the last images to a big one
+        command = 'montage "'+('" "'.join(pngs))+'" -tile 2x5 -geometry +0+10 '+outFile
+        print command
+        os.system(command)
+        groups.append(outFile)
     return groups
 
 def rmPnggroups(pnggroups):
@@ -371,7 +372,7 @@ def rmPnggroups(pnggroups):
     os.system(command)
 
 def convertPnggroupsToPdf(pnggroups, outFile):
-    command = 'convert "'+('" "'.join(pnggroups))+'" -units PixelsPerInch -density 300x300 '+outFile
+    command = 'convert "'+('" "'.join(pnggroups))+'" -repage 2480x3508+25+100 -units PixelsPerInch -density 300x300 '+outFile
     print command
     os.system(command)
 
