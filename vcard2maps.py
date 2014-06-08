@@ -18,7 +18,7 @@ import pysvg.parser
 
 import geocoder
 class Settings:
-    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, outputMRulesName, outputMScriptName, outDir, logFile ):
+    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNameToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
         self.tempFilterRule = tempFilterRule
         self.vcardFileName = vcardFileName
         self.outVCard = outVCard
@@ -27,6 +27,7 @@ class Settings:
         self.outputMRulesName = outputMRulesName
         self.outDir = outDir
         self.logFile = logFile
+        self.contactNameToExtract = contactNameToExtract
 
 class Address:
     def __init__(self, country, postcode, city, street, housenumber):
@@ -113,7 +114,7 @@ def createSingleContactRule(contact,settings):
     """
     creates a specific render rule to highlight the contact address building
     """
-    filterTemplate = '(addr:housenumber=$housenumber AND addr:street="$street")'
+    filterTemplate = '(addr:housenumber="$housenumber" AND addr:street="$street")'
     t = Template(filterTemplate)
     filter = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
 
@@ -126,7 +127,7 @@ def initFilter(contact,settings):
     """
     starts a filtering statement, to highlight multiple addresses
     """
-    filterTemplate = '(addr:housenumber=$housenumber AND addr:street="$street")'
+    filterTemplate = '(addr:housenumber="$housenumber" AND addr:street="$street")'
     t = Template(filterTemplate)
     new = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
     out = open(settings.tempFilterRule, "w+").write(new)
@@ -135,7 +136,7 @@ def addFilter(contact,settings):
     """
     adds an address to a filtering statement, to highlight multiple addresses
     """
-    filterTemplate = ' OR (addr:housenumber=$housenumber AND addr:street="$street")'
+    filterTemplate = ' OR (addr:housenumber="$housenumber" AND addr:street="$street")'
     t = Template(filterTemplate)
     new = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
     out = open(settings.tempFilterRule, "a").write(new)
@@ -280,7 +281,7 @@ def processMultiVCard(settings):
 
         if line.startswith('END:VCARD'):
             vcardStarted = False
-            if containsCategory(vcardBuffer, 'Gast'):
+            if inFilter(vcardBuffer, settings):
                 count = count + 1
                 print "read vcard no: "+str(idx) + " gast count: "+str(count)
                 print vcardBuffer
@@ -291,6 +292,22 @@ def processMultiVCard(settings):
 
     vCardFile.close()
     print '\nused ' + str(idx) + ' vCards';
+
+def inFilter(vcardText, settings):
+    allowed = False
+    nameMatches = False
+    categoryMatches = False
+    if settings.contactNameToExtract is None:
+        nameMatches = True
+    elif getPreNameFromRaw(vcardText).lower == settings.contactNameToExtract.lower:
+        nameMatches = True
+    else:
+        nameMatches = False
+
+    categoryMatches = containsCategory(vcardText, 'Gast')
+
+    allowed = nameMatches and categoryMatches
+    return allowed
 
 def svgAddName(filename, name):
     svg = pysvg.parser.parse(filename)
@@ -308,7 +325,56 @@ def svgAddName(filename, name):
 
 def convertSvgToPng(filename):
     #TODO use filename
-    os.system("inkscape -f /tmp/test.svg -z -e /tmp/test.png -w 1200 -h 600")
+    outfile,extension = filename.rsplit(".",1)
+    os.system("inkscape -f '"+filename+"' -z -e '"+outfile+".png' -w 1200 -h 600")
+
+def convertSvgsInDir(path):
+    for file in os.listdir(path):
+        if file.endswith(".svg"):
+            filename = path+"/"+file
+            print filename
+            convertSvgToPng(filename)
+
+def convertPngsToPnggroups(path):
+    groupCount = 0
+    groups = []
+    pngs = []
+    for file in os.listdir(path):
+        if file.endswith(".png"):
+            filename = path+"/"+file
+            print filename
+            pngs.append(filename)
+            if len(pngs) == 10:
+                outFile = "/tmp/group_"+str(groupCount)+".png"
+                files = '" "'.join(pngs)
+
+                #merge 10 images to a big one
+                command = 'montage "'+files+'" -tile 2x5 -geometry +0+10 '+outFile
+                print command
+                os.system(command)
+                groups.append(outFile)
+                groupCount = groupCount + 1
+                pngs = []
+
+    outFile = "group_"+str(groupCount)+".png"
+
+    #merge as well the last images to a big one
+    command = 'montage "'+('" "'.join(pngs))+'" -tile 2x5 -geometry +0+10 '+outFile
+    print command
+    os.system(command)
+    groups.append(outFile)
+    return groups
+
+def rmPnggroups(pnggroups):
+    command = 'rm "'+('" "'.join(pnggroups))+'"'
+    print command
+    os.system(command)
+
+def convertPnggroupsToPdf(pnggroups, outFile):
+    command = 'convert "'+('" "'.join(pnggroups))+'" -units PixelsPerInch -density 300x300 '+outFile
+    print command
+    os.system(command)
+
 
 def downloadOsmData(bboxOverpass,name):
 #    server = "overpass.osm.rambler.ru/cgi/interpreter"
@@ -324,17 +390,18 @@ def usage():
 def getSettings():
     tempFileFilterRuleName = "temp.filter_rule"
     gpsCsvFileName = "posdb"
+    contactNameToExtract = None
     outputMRulesName = str("Contacts.mrules")
     outputMScriptName = str("Contacts.mscript")
     outVCard = "out.vcf"
     outDir = "/tmp/"#has to stop with /
     logFile = "log"
-    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName, outputMRulesName, outputMScriptName, outDir, logFile)
+    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNameToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
 
 def main(argv):
 
     try:
-        opts, args = getopt.getopt(argv,"hf:",["help","vcardfile="])
+        opts, args = getopt.getopt(argv,"hf:cn:p",["help","vcardfile=","convert","contact-name=","convert2pdf"])
     except getopt.GetoptError as err:
         print str(err) # will print something like "option -a not recognized"
         usage()
@@ -345,6 +412,20 @@ def main(argv):
         if opt in ('-?', "help",'-h'):
             usage()
             sys.exit()
+        elif opt in ("-c", "--convert"):
+            convertSvgsInDir("/tmp")
+            return
+        elif opt in ("-p", "--convert2pdf"):
+            workingDir = "/tmp"
+            print "starting to merge pngs..."
+            pnggroups = convertPngsToPnggroups(workingDir)
+            print "starting to convert merged pngs to pdf..."
+            outFile = "mapsToPrint.pdf"
+            convertPnggroupsToPdf(pnggroups, outFile)
+            rmPnggroups(pnggroups)
+            return
+        elif opt in ("-n", "--name"):
+            settings.contactNameToExtract = arg
         elif opt in ("-f", "--vcardfile"):
             settings.vcardFileName = arg
         else:
