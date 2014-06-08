@@ -114,6 +114,24 @@ properties
 	
 rules
 
+	target : our target
+		define
+			line-style : dash
+			line-width : 0.5
+			line-color : black
+			line-end-cap : square
+			line-start-cap : square
+		define
+			font-size : 15:4;18:9;20:14
+			min-zoom : 15
+			text-halo-width : 2
+			fill-color : black
+			fill-hatch-color : white
+			fill-hatch : cross
+
+		draw : line
+		draw : fill
+
 //tubs
 	target : tubs
 		define
@@ -153,24 +171,6 @@ rules
 //		else
 //			define
 //				text-offset-vertical : 15:-4;18:-9;20:-14
-
-	target : our target
-		define
-			line-style : dash
-			line-width : 0.5
-			line-color : red
-			line-end-cap : square
-			line-start-cap : square
-		define
-			font-size : 15:4;18:9;20:14
-			min-zoom : 15
-			text-halo-width : 2
-			fill-color : red
-			fill-hatch-color : lime
-			fill-hatch : cross
-
-		draw : line
-		draw : fill
 
 	target : building use*
 		define
