@@ -281,7 +281,7 @@ def processMultiVCard(settings):
 
         if line.startswith('END:VCARD'):
             vcardStarted = False
-            if inFilter(vcardBuffer, settings):
+            if inContactFilter(vcardBuffer, settings):
                 count = count + 1
                 print "read vcard no: "+str(idx) + " gast count: "+str(count)
                 print vcardBuffer
@@ -293,7 +293,8 @@ def processMultiVCard(settings):
     vCardFile.close()
     print '\nused ' + str(idx) + ' vCards';
 
-def inFilter(vcardText, settings):
+def inContactFilter(vcardText, settings):
+#TODO fix this - filter by name does not work
     allowed = False
     nameMatches = False
     categoryMatches = False
@@ -366,6 +367,11 @@ def convertPngsToPnggroups(path):
         groups.append(outFile)
     return groups
 
+def renderMaps(mscriptFileName):
+    command = "maperitive-bin `pwd`/Contacts.mscript"
+    print command
+    os.system(command)
+
 def rmPnggroups(pnggroups):
     command = 'rm "'+('" "'.join(pnggroups))+'"'
     print command
@@ -402,7 +408,7 @@ def getSettings():
 def main(argv):
 
     try:
-        opts, args = getopt.getopt(argv,"hf:cn:p",["help","vcardfile=","convert","contact-name=","convert2pdf"])
+        opts, args = getopt.getopt(argv,"hf:cn:pr",["help","vcardfile=","convert","contact-name=","convert2pdf","render"])
     except getopt.GetoptError as err:
         print str(err) # will print something like "option -a not recognized"
         usage()
@@ -415,6 +421,7 @@ def main(argv):
             sys.exit()
         elif opt in ("-c", "--convert"):
             convertSvgsInDir("/tmp")
+            print "to group the png-files and convert them to pdf run option -p"
             return
         elif opt in ("-p", "--convert2pdf"):
             workingDir = "/tmp"
@@ -424,6 +431,11 @@ def main(argv):
             outFile = "mapsToPrint.pdf"
             convertPnggroupsToPdf(pnggroups, outFile)
             rmPnggroups(pnggroups)
+            return
+        elif opt in ("-r", "--render"):
+            renderMaps(settings.outputMScriptName)
+            print "first edit the svg-files if you like (but they will be overwritten after rerun with option -r)"
+            print " -> run this script with option -c to convert to png-files"
             return
         elif opt in ("-n", "--name"):
             settings.contactNameToExtract = arg
@@ -449,6 +461,11 @@ def main(argv):
     print "Processing VCard "+settings.vcardFileName
     processMultiVCard(settings)
     finishMultiContactRule(settings)
+    #finishMultiContactScript
+    open(settings.outputMScriptName, "a+").write("exit")
+    print "edit the osm-files if you like"
+    print "see log file for errors"
+    print "-> continue with option -r"
 
 if __name__ == "__main__":
    main(sys.argv[1:])
