@@ -35,7 +35,7 @@ from pysvg.builders import *
 import pysvg.parser
 
 class Settings:
-    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
+    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
         self.tempFilterRule = tempFilterRule
         self.vcardFileName = vcardFileName
         self.outVCard = outVCard
@@ -45,6 +45,7 @@ class Settings:
         self.outDir = outDir
         self.logFile = logFile
         self.contactNamesToExtract = contactNamesToExtract
+        self.categoriesToExtract = categoriesToExtract
 
 class Address:
     def __init__(self, country, postcode, city, street, housenumber):
@@ -234,6 +235,14 @@ def getPreNameFromRaw(text):
         return match.group(0).split(';')[1]
     return ""
 
+def getCategoriesFromRaw(text):
+    pattern = re.compile('(?<=\nCATEGORIES:).*')
+    match = pattern.search(text)
+    if match:
+        #extracts the prename name
+        return match.group(0).strip("\r").split(',')
+    return ""
+
 def containsCategory(text,category):
     pattern = re.compile('\nCATEGORIES:.*'+category)
     match = pattern.search(text)
@@ -312,16 +321,21 @@ def processMultiVCard(settings):
 
 def inContactFilter(vcardText, settings):
     allowed = False
-    nameMatches = False
-    categoryMatches = False
+
     if len(settings.contactNamesToExtract) is 0:
+        #by default true
         nameMatches = True
     elif getPreNameFromRaw(vcardText).lower() in settings.contactNamesToExtract:
         nameMatches = True
     else:
         nameMatches = False
 
-    categoryMatches = containsCategory(vcardText, 'Gast')
+    #categoryMatches = containsCategory(vcardText, 'Gast')
+    categories = getCategoriesFromRaw(vcardText)
+    categoryMatches = len(set(categories).intersection(set(settings.categoriesToExtract)))!=0
+    if len(settings.categoriesToExtract)==0:
+        #by default true
+        categoryMatches = True
 
     allowed = nameMatches and categoryMatches
     return allowed
@@ -414,17 +428,18 @@ def getSettings():
     tempFileFilterRuleName = "temp.filter_rule"
     gpsCsvFileName = "posdb"
     contactNamesToExtract = []
+    categoriesToExtract = []
     outputMRulesName = str("Contacts.mrules")
     outputMScriptName = str("Contacts.mscript")
     outVCard = "out.vcf"
     outDir = "/tmp/"#has to stop with /
     logFile = "log"
-    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
+    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
 
 def main(argv):
 
     try:
-        opts, args = getopt.getopt(argv,"hf:cn:pr",["help","vcardfile=","convert","contact-name=","convert2pdf","render"])
+        opts, args = getopt.getopt(argv,"hf:cn:k:pr",["help","vcardfile=","convert","contact-name=","categories=","convert2pdf","render"])
     except getopt.GetoptError as err:
         print str(err) # will print something like "option -a not recognized"
         usage()
@@ -458,6 +473,9 @@ def main(argv):
         elif opt in ("-n", "--names"):
             settings.contactNamesToExtract = arg.lower().split(";")
             print settings.contactNamesToExtract
+        elif opt in ("-k", "--categories"):
+            settings.categoriesToExtract = arg.split(";")
+            print settings.categoriesToExtract
         elif opt in ("-f", "--vcardfile"):
             settings.vcardFileName = arg
         else:
