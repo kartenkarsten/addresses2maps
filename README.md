@@ -26,6 +26,7 @@ it's running under Linux - others might be difficult right now because of heavy 
 - montage (imagemagick)
 - Inkscape
 - Maperitive 
+
 ## for python install with pip
 - pysvg
 - geocoder
