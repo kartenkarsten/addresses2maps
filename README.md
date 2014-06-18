@@ -27,6 +27,6 @@ it's running under Linux - others might be difficult right now because of heavy 
 - Inkscape
 - Maperitive 
 
-## for python install with pip
+#### for python install with pip
 - pysvg
 - geocoder
