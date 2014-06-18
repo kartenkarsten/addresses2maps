@@ -10,7 +10,8 @@ You want awesome table name cards on your next anniversary
 # Features
 - parses [vcards (vcf-files)](http://de.wikipedia.org/wiki/Vcard)
 - filters contacts by name and or category
-- uses [Nominatim](http://wiki.openstreetmap.org/wiki/Nominatim) for geocoding of address information
+- uses coordinates from vcard as map center
+- or without coordinates it uses [Nominatim](http://wiki.openstreetmap.org/wiki/Nominatim) for geocoding of address information
 - downloads the OpenstreetMap raw data with the [Overpass-API](http://wiki.openstreetmap.org/wiki/Overpass_API)
 - generates a [Maperitive](http://maperitive.net/) render rule based on [Cadastre Style](http://wiki.openstreetmap.org/wiki/User:Nakaner/Cadastre_Style)
 - the hoses of our contacts will be highlited and in the center of each map
