@@ -18,7 +18,7 @@ import pysvg.parser
 
 import geocoder
 class Settings:
-    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNameToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
+    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
         self.tempFilterRule = tempFilterRule
         self.vcardFileName = vcardFileName
         self.outVCard = outVCard
@@ -27,7 +27,7 @@ class Settings:
         self.outputMRulesName = outputMRulesName
         self.outDir = outDir
         self.logFile = logFile
-        self.contactNameToExtract = contactNameToExtract
+        self.contactNamesToExtract = contactNamesToExtract
 
 class Address:
     def __init__(self, country, postcode, city, street, housenumber):
@@ -294,13 +294,12 @@ def processMultiVCard(settings):
     print '\nused ' + str(idx) + ' vCards';
 
 def inContactFilter(vcardText, settings):
-#TODO fix this - filter by name does not work
     allowed = False
     nameMatches = False
     categoryMatches = False
-    if settings.contactNameToExtract is None:
+    if len(settings.contactNamesToExtract) is 0:
         nameMatches = True
-    elif getPreNameFromRaw(vcardText).lower == settings.contactNameToExtract.lower:
+    elif getPreNameFromRaw(vcardText).lower() in settings.contactNamesToExtract:
         nameMatches = True
     else:
         nameMatches = False
@@ -350,7 +349,7 @@ def convertPngsToPnggroups(path):
                 files = '" "'.join(pngs)
 
                 #merge 10 images to a big one
-                command = 'montage "'+files+'" -tile 2x5 -geometry +0+10 '+outFile
+                command = 'montage "'+files+'" -tile 2x6 -geometry +0+0 '+outFile
                 print command
                 os.system(command)
                 groups.append(outFile)
@@ -361,7 +360,7 @@ def convertPngsToPnggroups(path):
         outFile = "group_"+str(groupCount)+".png"
 
         #merge as well the last images to a big one
-        command = 'montage "'+('" "'.join(pngs))+'" -tile 2x5 -geometry +0+10 '+outFile
+        command = 'montage "'+('" "'.join(pngs))+'" -tile 2x6 -geometry +0+0 '+outFile
         print command
         os.system(command)
         groups.append(outFile)
@@ -378,7 +377,7 @@ def rmPnggroups(pnggroups):
     os.system(command)
 
 def convertPnggroupsToPdf(pnggroups, outFile):
-    command = 'convert "'+('" "'.join(pnggroups))+'" -repage 2480x3508+25+100 -units PixelsPerInch -density 300x300 '+outFile
+    command = 'convert "'+('" "'.join(pnggroups))+'" -repage 2480x3508+25+25 -units PixelsPerInch -density 300x300 '+outFile
     print command
     os.system(command)
 
@@ -397,13 +396,13 @@ def usage():
 def getSettings():
     tempFileFilterRuleName = "temp.filter_rule"
     gpsCsvFileName = "posdb"
-    contactNameToExtract = None
+    contactNamesToExtract = []
     outputMRulesName = str("Contacts.mrules")
     outputMScriptName = str("Contacts.mscript")
     outVCard = "out.vcf"
     outDir = "/tmp/"#has to stop with /
     logFile = "log"
-    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNameToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
+    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
 
 def main(argv):
 
@@ -437,8 +436,9 @@ def main(argv):
             print "first edit the svg-files if you like (but they will be overwritten after rerun with option -r)"
             print " -> run this script with option -c to convert to png-files"
             return
-        elif opt in ("-n", "--name"):
-            settings.contactNameToExtract = arg
+        elif opt in ("-n", "--names"):
+            settings.contactNamesToExtract = arg.lower().split(";")
+            print settings.contactNamesToExtract
         elif opt in ("-f", "--vcardfile"):
             settings.vcardFileName = arg
         else:
