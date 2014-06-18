@@ -1,9 +1,27 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
+#
+# Known Bugs:
+#  - downloaded osm-data are sometimes incomplete if there is a way without a point in that area
+#  -> possible workaround - just use a bigger area for download or fix suspicious files with JOSM
+#
+# Licence:
+#  The MIT License (MIT)
+#  -> see LICENCE File
+#
+# TODO:
+#  - use for each vcf-file a seperate temp dir
+#  - let change filter by category with parameter
+#  - split Code in multiple files
+#  - improve svg post processing (to insert Contact name)
+#  - add osm raw data pre processing (to set street and housnumber to the building)
+#  - os independence
+
 from string import Template
 import sys, getopt
 import os.path
 import re
+import geocoder
 #svg post processing
 from pysvg.filter import *
 from pysvg.gradient import *
@@ -16,7 +34,6 @@ from pysvg.text import *
 from pysvg.builders import *
 import pysvg.parser
 
-import geocoder
 class Settings:
     def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
         self.tempFilterRule = tempFilterRule
@@ -420,6 +437,7 @@ def main(argv):
             sys.exit()
         elif opt in ("-c", "--convert"):
             convertSvgsInDir("/tmp")
+            print "-------------------------------------------------------"
             print "to group the png-files and convert them to pdf run option -p"
             return
         elif opt in ("-p", "--convert2pdf"):
@@ -433,6 +451,7 @@ def main(argv):
             return
         elif opt in ("-r", "--render"):
             renderMaps(settings.outputMScriptName)
+            print "-------------------------------------------------------"
             print "first edit the svg-files if you like (but they will be overwritten after rerun with option -r)"
             print " -> run this script with option -c to convert to png-files"
             return
@@ -463,6 +482,7 @@ def main(argv):
     finishMultiContactRule(settings)
     #finishMultiContactScript
     open(settings.outputMScriptName, "a+").write("exit")
+    print "-------------------------------------------------------"
     print "edit the osm-files if you like"
     print "see log file for errors"
     print "-> continue with option -r"

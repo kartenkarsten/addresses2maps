@@ -1,14 +1,14 @@
 vcard2maps
 ==========
 
-parses a vcard to render a small OSM-map of some contacts
+parses an addressbook (vcf-file) to render a small OSM-map (4.5cm x 9.5cm 300dpi) of some contacts
 ![This is the rendered map from the example vcard](https://raw.githubusercontent.com/kartenkarsten/vcard2maps/master/John.png "example map")
 
 # Usecase
 You want awesome table name cards on your next anniversary
 
 # Features
-- parses vcards (vcf-files)
+- parses [vcards (vcf-files)](http://de.wikipedia.org/wiki/Vcard)
 - filters contacts by name and or category
 - uses [Nominatim](http://wiki.openstreetmap.org/wiki/Nominatim) for geocoding of address information
 - downloads the OpenstreetMap raw data with the [Overpass-API](http://wiki.openstreetmap.org/wiki/Overpass_API)
