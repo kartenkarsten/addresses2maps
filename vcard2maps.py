@@ -136,7 +136,7 @@ def createSingleContactRule(contact,settings):
     t = Template(filterTemplate)
     filter = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
 
-    file = "template.mrules"
+    file = "/app/template.mrules"
     t = Template(open(file).read())
     new = t.substitute(filter=filter)
     out = open(settings.outputMRulesName, "w+").write(new)
@@ -160,7 +160,7 @@ def addFilter(contact,settings):
     out = open(settings.tempFilterRule, "a").write(new)
 
 def finishMultiContactRule(settings):
-    file = "template.mrules"
+    file = "/app/template.mrules"
     filter = open(settings.tempFilterRule).read()
     t = Template(open(file).read())
     new = t.substitute(filter=filter)
@@ -170,17 +170,17 @@ def finishMultiContactRule(settings):
 
 
 def createSingleContactScript(contact,settings):
-    file = "template.mscript"
+    file = "/app/template.mscript"
     osmGetDataCommand= "download-osm-overpass"
     t = Template(open(file).read())
     new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name, outputDir=settings.outDir, osmGetDataCommand=getDataCommand)
     out = open(settings.outputMScriptName, "w+").write(new)
 
 def addToScript(contact, settings):
-    file = "template.mscript"
+    file = "/app/template.mscript"
     t = Template(open(file).read())
     #TODO put this in settings
-    getDataCommand= 'load-source "/home/karsten/workspace/projekte/osm/tischkarten/'+contact.position.toString()+'.osm"'
+    getDataCommand= 'load-source "/data/'+contact.position.toString()+'.osm"'
     #osmGetDataCommand= "download-osm-overpass"
     new = t.substitute(bbox= contact.position.toBbox(), rulename=str(settings.outputMRulesName), name=contact.name, outputDir=settings.outDir, osmGetDataCommand=getDataCommand)
     out = open(settings.outputMScriptName, "a+").write(new)
@@ -277,7 +277,7 @@ def processSingleVCard(vcardText, settings):
         print "added filter for "+c.name
     else:
         initFilter(c, settings)
-        print "initicialize filter with "+c.name
+        print "initialize filter with "+c.name
 
     addToScript(c, settings)
     print "added "+c.name+" to render script"
@@ -352,7 +352,7 @@ def svgAddName(filename, name):
     #x1,y1,x2,y2
     for i in range(len(name)):
         svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
-    svg.save("/tmp/test.svg")
+    svg.save("/data/test.svg")
 
 def convertSvgToPng(filename):
     #TODO use filename
@@ -376,7 +376,7 @@ def convertPngsToPnggroups(path):
             print filename
             pngs.append(filename)
             if len(pngs) == 10:
-                outFile = "/tmp/group_"+str(groupCount)+".png"
+                outFile = "/data/group_"+str(groupCount)+".png"
                 files = '" "'.join(pngs)
 
                 #merge 10 images to a big one
@@ -432,7 +432,7 @@ def getSettings():
     outputMRulesName = str("Contacts.mrules")
     outputMScriptName = str("Contacts.mscript")
     outVCard = "out.vcf"
-    outDir = "/tmp/"#has to stop with /
+    outDir = "/data/"#has to stop with /
     logFile = "log"
     return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
 

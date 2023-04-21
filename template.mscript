@@ -8,7 +8,7 @@ set-geo-bounds $bbox
 set-print-bounds-geo $bbox
 
 // TODO change this path
-use-ruleset location=/home/karsten/workspace/projekte/osm/tischkarten/$rulename
+use-ruleset location=/data/$rulename
 
 $osmGetDataCommand
 

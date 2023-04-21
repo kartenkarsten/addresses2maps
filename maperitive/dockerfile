@@ -1,0 +1,24 @@
+# dockerfile for maperative
+# Use Ubuntu as the base image
+FROM archlinux:latest@sha256:0376f7766d553ea977189af55c1ace9f6678ceb11169b4d043197f252f41bc05
+
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm mono libgdiplus wget unzip xorg-xauth xorg-server xorg-xhost gtk2 && \
+    pacman -Scc --noconfirm
+
+
+# Configure X11 display server
+ENV DISPLAY=:0
+
+COPY ./*.pkg.tar.xz /tmp/
+
+# Download and install Maperitive
+WORKDIR /tmp
+RUN pacman -U --noconfirm *.pkg.tar.xz && rm /tmp/*.pkg.tar.xz
+
+#RUN pacman -S --noconfirm gnu-free-fonts imagemagick inkscape 
+
+# Set the working directory and entrypoint
+WORKDIR /data
+#ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/usr/bin/maperitive-bin"]
