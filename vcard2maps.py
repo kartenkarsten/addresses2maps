@@ -19,7 +19,7 @@
 
 from string import Template
 import sys, getopt
-import os.path
+import os
 import re
 import geocoder
 #svg post processing
@@ -35,15 +35,22 @@ from pysvg.builders import *
 import pysvg.parser
 
 class Settings:
-    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, outDir, logFile ):
+    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, dataDir, logFile ):
         self.tempFilterRule = tempFilterRule
         self.vcardFileName = vcardFileName
-        self.outVCard = outVCard
-        self.gpsCsvFileName = gpsCsvFileName
-        self.outputMScriptName = outputMScriptName
-        self.outputMRulesName = outputMRulesName
-        self.outDir = outDir
-        self.logFile = logFile
+        self.cacheDir = str(dataDir) + "cache/"
+        if not os.path.exists(self.cacheDir):
+            os.makedirs(self.cacheDir)
+        self.outDir = str(dataDir) + "out/"
+        if not os.path.exists(self.outDir):
+            os.makedirs(self.outDir)
+        self.dataDir = str(dataDir)
+        self.templateDir = str(dataDir)
+        self.outVCard = str(self.outDir) + outVCard
+        self.gpsCsvFileName = str(self.cacheDir) + gpsCsvFileName
+        self.outputMScriptName = str(self.outDir) + outputMScriptName
+        self.outputMRulesName = str(self.outDir) + outputMRulesName
+        self.logFile = str(self.outDir) + logFile
         self.contactNamesToExtract = contactNamesToExtract
         self.categoriesToExtract = categoriesToExtract
 
@@ -136,7 +143,7 @@ def createSingleContactRule(contact,settings):
     t = Template(filterTemplate)
     filter = t.substitute(street=contact.address.street, housenumber=contact.address.housenumber)
 
-    file = "/app/template.mrules"
+    file = settings.templateDir + "template.mrules"
     t = Template(open(file).read())
     new = t.substitute(filter=filter)
     out = open(settings.outputMRulesName, "w+").write(new)
@@ -160,7 +167,7 @@ def addFilter(contact,settings):
     out = open(settings.tempFilterRule, "a").write(new)
 
 def finishMultiContactRule(settings):
-    file = "/app/template.mrules"
+    file = settings.templateDir + "template.mrules"
     filter = open(settings.tempFilterRule).read()
     t = Template(open(file).read())
     new = t.substitute(filter=filter)
@@ -170,17 +177,17 @@ def finishMultiContactRule(settings):
 
 
 def createSingleContactScript(contact,settings):
-    file = "/app/template.mscript"
+    file = settings.templateDir + "template.mscript"
     osmGetDataCommand= "download-osm-overpass"
     t = Template(open(file).read())
     new = t.substitute(bbox= contact.position.toBbox(), rulename=contact.name, name=contact.name, outputDir=settings.outDir, osmGetDataCommand=getDataCommand)
     out = open(settings.outputMScriptName, "w+").write(new)
 
 def addToScript(contact, settings):
-    file = "/app/template.mscript"
+    file = settings.templateDir + "template.mscript"
     t = Template(open(file).read())
     #TODO put this in settings
-    getDataCommand= 'load-source "/data/'+contact.position.toString()+'.osm"'
+    getDataCommand= 'load-source "'+settings.cacheDir+contact.position.toString()+'.osm"'
     #osmGetDataCommand= "download-osm-overpass"
     new = t.substitute(bbox= contact.position.toBbox(), rulename=str(settings.outputMRulesName), name=contact.name, outputDir=settings.outDir, osmGetDataCommand=getDataCommand)
     out = open(settings.outputMScriptName, "a+").write(new)
@@ -263,11 +270,11 @@ def processSingleVCard(vcardText, settings):
             addrString = adr.toString()
         except:
             addrString = "None"
-        f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup faild ("+addrString+")\n")
+        f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup failed ("+addrString+")\n")
         return None
 
-    if not (os.path.exists(c.position.toString()+".osm")):
-        downloadOsmData(c.position.toBbox(),c.position.toString()+".osm")
+    if not (os.path.exists(settings.cacheDir + c.position.toString()+".osm")):
+        downloadOsmData(c.position.toBbox(), settings.cacheDir + c.position.toString()+".osm")
     newVCardText = setGeoToRaw(vcardText, c.position)
     #log position:
     open(settings.gpsCsvFileName,"a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
@@ -432,9 +439,10 @@ def getSettings():
     outputMRulesName = str("Contacts.mrules")
     outputMScriptName = str("Contacts.mscript")
     outVCard = "out.vcf"
-    outDir = "/data/"#has to stop with /
+    dataDir = "/data/"#has to stop with /
     logFile = "log"
-    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, outDir, logFile)
+# todo create cache and out dir if not existent
+    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, dataDir, logFile)
 
 def main(argv):
 
