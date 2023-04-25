@@ -46,6 +46,6 @@ docker build -t maperitive .
 ## render svg
 
 ```
-docker run -it -v $(pwd)/example:/data vcard2svg -f example_card.vcf
+docker run --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/example,target=/data vcard2svg -f example_card.vcf
 docker run -it -v $(pwd)/example/:/data/ -v /tmp/.X11-unix:/tmp/.X11-unix -v /run/user/1000/gdm/Xauthority:/root/.Xauthority -e DISPLAY=:0 --network host --privileged maperitive /data/Contacts.mscript
 ```
