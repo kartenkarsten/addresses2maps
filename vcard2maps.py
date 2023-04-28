@@ -21,6 +21,7 @@ from string import Template
 import sys, getopt
 import os
 import re
+import csv
 import geocoder
 #svg post processing
 from pysvg.filter import *
@@ -35,9 +36,10 @@ from pysvg.builders import *
 import pysvg.parser
 
 class Settings:
-    def __init__(self, vcardFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, dataDir, logFile ):
+    def __init__(self, vcardFileName, csvFileName, outVCard, tempFilterRule, gpsCsvFileName, contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, dataDir, logFile ):
         self.tempFilterRule = tempFilterRule
         self.vcardFileName = vcardFileName
+        self.csvFileName = csvFileName
         self.cacheDir = str(dataDir) + "cache/"
         if not os.path.exists(self.cacheDir):
             os.makedirs(self.cacheDir)
@@ -257,6 +259,22 @@ def containsCategory(text,category):
         return True
     return False
 
+# Contact, Settings
+def processContact(c, settings):
+    if not (os.path.exists(settings.cacheDir + c.position.toString()+".osm")):
+        downloadOsmData(c.position.toBbox(), settings.cacheDir + c.position.toString()+".osm")
+    #log position:
+    open(settings.gpsCsvFileName,"a+").write(c.name+";"+c.address.street+";"+c.address.housenumber+";"+c.address.postcode+";"+c.address.city+";"+c.address.country+";"+str(c.position.lat)+"/"+str(c.position.lon)+"\n")
+    if (os.path.exists(settings.tempFilterRule)):
+        addFilter(c,settings)
+        print "added filter for "+c.name
+    else:
+        initFilter(c, settings)
+        print "initialize filter with "+c.name
+
+    addToScript(c, settings)
+    print "added "+c.name+" to render script"
+
 def processSingleVCard(vcardText, settings):
     name = getPreNameFromRaw(vcardText)
     adr = getFirstHomeAddressFromRaw(vcardText)
@@ -273,22 +291,30 @@ def processSingleVCard(vcardText, settings):
         f = open(settings.logFile,"a+").write("ERROR: in "+settings.vcardFileName+" on "+name+" address incomplete or position lookup failed ("+addrString+")\n")
         return None
 
-    if not (os.path.exists(settings.cacheDir + c.position.toString()+".osm")):
-        downloadOsmData(c.position.toBbox(), settings.cacheDir + c.position.toString()+".osm")
     newVCardText = setGeoToRaw(vcardText, c.position)
-    #log position:
-    open(settings.gpsCsvFileName,"a+").write(c.name+", "+str(c.position.lat)+", "+str(c.position.lon)+"\n")
-
-    if (os.path.exists(settings.tempFilterRule)):
-        addFilter(c,settings)
-        print "added filter for "+c.name
-    else:
-        initFilter(c, settings)
-        print "initialize filter with "+c.name
-
-    addToScript(c, settings)
-    print "added "+c.name+" to render script"
+    processContact(c, settings)
     return newVCardText
+
+def processCsv(settings):
+    # reads csv file and calls processContact for each line
+    with open(settings.csvFileName, 'rb') as csvfile:
+        csvreader = csv.reader(csvfile, delimiter=';')
+        for row in csvreader:
+            print(row)
+            print("length; "+str(len(row)))
+            assert len(row)==7
+            # country, postcode, city, street, housenumber):
+            adr = Address(row[5],row[3],row[4],row[1],row[2])
+            if ("" == row[6]):
+                c = Contact(row[0], adr.lookupPosition(), adr)
+                processContact(c, settings)
+            elif ('/' in row[6]):
+                coordninates = row[6].split('/', 1)
+                geo = Position(float(coordninates[0]),float(coordninates[1]))
+                c = Contact(row[0], geo, adr)
+                processContact(c, settings)
+            else:
+                raise NameError("ERROR: can invalid value for gps position in csv")
 
 def processMultiVCard(settings):
     finishFlag = False
@@ -433,16 +459,18 @@ def usage():
 
 def getSettings():
     tempFileFilterRuleName = "temp.filter_rule"
-    gpsCsvFileName = "posdb"
+    gpsCsvFileName = "addresses_with_coordinates.csv"
     contactNamesToExtract = []
     categoriesToExtract = []
     outputMRulesName = str("Contacts.mrules")
     outputMScriptName = str("Contacts.mscript")
     outVCard = "out.vcf"
     dataDir = "/data/"#has to stop with /
+    defaultVcardName = dataDir+"addresses.vcf"
+    defaultCsvName = dataDir+"addresses.csv"
     logFile = "log"
 # todo create cache and out dir if not existent
-    return Settings(None, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, dataDir, logFile)
+    return Settings(defaultVcardName, defaultCsvName, outVCard, tempFileFilterRuleName, gpsCsvFileName,contactNamesToExtract, categoriesToExtract, outputMRulesName, outputMScriptName, dataDir, logFile)
 
 def main(argv):
 
@@ -503,8 +531,10 @@ def main(argv):
         os.remove(settings.outVCard)
 
 
-    print "Processing VCard "+settings.vcardFileName
-    processMultiVCard(settings)
+    #print "Processing VCard "+settings.vcardFileName
+    #processMultiVCard(settings)
+    print "Processing CSV "+settings.vcardFileName
+    processCsv(settings)
     finishMultiContactRule(settings)
     #finishMultiContactScript
     open(settings.outputMScriptName, "a+").write("exit")
