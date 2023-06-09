@@ -43,7 +43,7 @@ class Settings:
         self.cacheDir = str(dataDir) + "cache/"
         if not os.path.exists(self.cacheDir):
             os.makedirs(self.cacheDir)
-        self.outDir = str(dataDir) + "out/"
+        self.outDir = str(dataDir) + "raw_svgs/"
         if not os.path.exists(self.outDir):
             os.makedirs(self.outDir)
         self.dataDir = str(dataDir)
