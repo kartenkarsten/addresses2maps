@@ -2,7 +2,7 @@ addresses2maps
 ==========
 
 parses an addressbook (csv-file) to render a small OSM-map (4.5cm x 9.5cm 300dpi) of some contacts
-![This is the rendered map from the example vcard](https://raw.githubusercontent.com/kartenkarsten/vcard2maps/master/John.png "example map")
+![This is the rendered map from the example vcard](https://raw.githubusercontent.com/kartenkarsten/vcard2maps/master/example/John.png "example map")
 
 # Usecase
 You want awesome table name cards on your next anniversary
