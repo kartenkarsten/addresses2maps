@@ -24,7 +24,7 @@ everything is dockerized to avoid the dependency hell of this outdated code
 # Usage
 
 Use the template folder as starting point.
-Replace the addresses.csv with your addresses e.g. by saving a libreoffice calc table with the columns name, street, housenumber, postcode, city, country, optional geo position as csv file.
+Replace the addresses.csv with your addresses e.g. by saving a libreoffice calc table with the columns name, street, housenumber, postcode, city, country, optional geo position as csv file. You need to use UTF-8 encoding and a ; as delimiter.
 If you are familiar with Maperitive you could adjust the template as well to create custom maps.
 
 ## build images
