@@ -8,7 +8,7 @@ set-geo-bounds $bbox
 set-print-bounds-geo $bbox
 
 // TODO change this path
-use-ruleset location=/data/$rulename
+use-ruleset location=$rulename
 
 $osmGetDataCommand
 
