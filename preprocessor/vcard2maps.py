@@ -50,6 +50,7 @@ class Settings:
         self.templateDir = str(dataDir)
         self.outVCard = str(self.outDir) + outVCard
         self.gpsCsvFileName = str(self.cacheDir) + gpsCsvFileName
+        self.csvFileNameFailures = str(self.cacheDir) + "problematicAdresses.csv"
         self.outputMScriptName = str(self.outDir) + outputMScriptName
         self.outputMRulesName = str(self.outDir) + outputMRulesName
         self.logFile = str(self.outDir) + logFile
@@ -68,10 +69,10 @@ class Address:
         self.housenumber = housenumber
         if (street == '' or street == None):
             self.street = None
-            print >> sys.stderr, "ERROR: Address has no street!"
+            print >> sys.stderr, "WARNING: Address has no street!"
         if (housenumber == '' or housenumber == None):
             self.housenumber = None
-            print >> sys.stderr, "ERROR: Address has no housenumber!"
+            print >> sys.stderr, "WARNING: Address has no housenumber!"
 
     def toString(self):
         string = self.country
@@ -120,6 +121,22 @@ class Contact:
             raise NameError("can not use this address :"+address.toString)
 
         # if no position is given - use the address to look one up
+        if (position == None):
+            # check cache folder for position
+            if os.path.exists(settings.gpsCsvFileName):
+                # Open the CSV file
+                with open(csv_file_path, "rb") as file:
+                    reader = csv.reader(file)
+                    # Iterate over each line in the CSV file
+                    for row in reader:
+                        if row[0].startswith(name):
+                            # parse cached position
+                            coordninates = row[6].split('/', 1)
+                            geo = Position(float(coordninates[0]),float(coordninates[1]))
+                            print("found entry in cache: "+row[0]+"="+geo)
+                            self.position = geo
+                            break
+
         if (position == None):
             print "has to lookup the address to get a gps position"
             self.position = address.lookupPosition()
@@ -265,6 +282,7 @@ def processContact(c, settings):
         downloadOsmData(c.position.toBbox(), settings.cacheDir + c.position.toString()+".osm")
     #log position:
     open(settings.gpsCsvFileName,"a+").write(c.name+";"+c.address.street+";"+c.address.housenumber+";"+c.address.postcode+";"+c.address.city+";"+c.address.country+";"+str(c.position.lat)+"/"+str(c.position.lon)+"\n")
+    # max 28 maps (~ 500 lines of code) can be rendered by a single mscript file
     if (os.path.exists(settings.tempFilterRule)):
         addFilter(c,settings)
         print "added filter for "+c.name
@@ -296,6 +314,11 @@ def processSingleVCard(vcardText, settings):
     return newVCardText
 
 def processCsv(settings):
+    # delete error file
+    if os.path.exists(settings.csvFileNameFailures):
+        os.remove(settings.csvFileNameFailures)
+
+    count = 0
     # reads csv file and calls processContact for each line
     with open(settings.csvFileName, 'rb') as csvfile:
         csvreader = csv.reader(csvfile, delimiter=';')
@@ -305,16 +328,34 @@ def processCsv(settings):
             assert len(row)==7
             # country, postcode, city, street, housenumber):
             adr = Address(row[5],row[3],row[4],row[1],row[2])
+            count = count + 1
             if ("" == row[6]):
-                c = Contact(row[0], adr.lookupPosition(), adr)
-                processContact(c, settings)
+                try:
+                  c = Contact(row[0], adr.lookupPosition(), adr)
+                  processContact(c, settings)
+                except:
+                    print >> sys.stderr, "ERROR: on parsing "+row[0]+" adding entry to error log"
+                    open(settings.csvFileNameFailures,"a+").write(row[0]+";"+row[1]+";"+row[2]+";"+row[3]+";"+row[4]+";"+row[5]+";"+row[6]+"\n")
+                    
             elif ('/' in row[6]):
-                coordninates = row[6].split('/', 1)
-                geo = Position(float(coordninates[0]),float(coordninates[1]))
-                c = Contact(row[0], geo, adr)
-                processContact(c, settings)
+                try:
+                    coordninates = row[6].split('/', 1)
+                    geo = Position(float(coordninates[0]),float(coordninates[1]))
+                    c = Contact(row[0], geo, adr)
+                    processContact(c, settings)
+                except:
+                    print >> sys.stderr, "ERROR: on parsing "+row[0]+" adding entry to error log"
+                    open(settings.csvFileNameFailures,"a+").write(row[0]+";"+row[1]+";"+row[2]+";"+row[3]+";"+row[4]+";"+row[5]+";"+row[6]+"\n")
             else:
                 raise NameError("ERROR: can invalid value for gps position in csv")
+
+    if count > 28:
+        print("\n WARNING: more than 28 Contacts collected into "+settings.outputMScriptName+" this will lead to a blocking redering!\n")
+    # checks for failed addresses
+    if os.path.exists(settings.csvFileNameFailures):
+        print("\n\nthe following addresses caused problems, please correct them")
+        with open(settings.csvFileNameFailures, "r") as file:
+            print(file.read())
 
 def processMultiVCard(settings):
     finishFlag = False
@@ -430,22 +471,6 @@ def convertPngsToPnggroups(path):
         groups.append(outFile)
     return groups
 
-def renderMaps(mscriptFileName):
-    command = "maperitive-bin `pwd`/Contacts.mscript"
-    print command
-    os.system(command)
-
-def rmPnggroups(pnggroups):
-    command = 'rm "'+('" "'.join(pnggroups))+'"'
-    print command
-    os.system(command)
-
-def convertPnggroupsToPdf(pnggroups, outFile):
-    command = 'convert "'+('" "'.join(pnggroups))+'" -repage 2480x3508+25+25 -units PixelsPerInch -density 300x300 '+outFile
-    print command
-    os.system(command)
-
-
 def downloadOsmData(bboxOverpass,name):
 #    server = "overpass.osm.rambler.ru/cgi/interpreter"
 #    querry = "data=(node("+bboxOverpass+");rel(bn)->.x;way("+bboxOverpass+");node(w)->.x;rel(bw););out;"
@@ -463,7 +488,7 @@ def getSettings():
     contactNamesToExtract = []
     categoriesToExtract = []
     outputMRulesName = str("Contacts.mrules")
-    outputMScriptName = str("Contacts.mscript")
+    outputMScriptName = str("Contacts{}.mscript")
     outVCard = "out.vcf"
     dataDir = "/data/"#has to stop with /
     defaultVcardName = dataDir+"addresses.vcf"
@@ -500,12 +525,6 @@ def main(argv):
             convertPnggroupsToPdf(pnggroups, outFile)
             rmPnggroups(pnggroups)
             return
-        elif opt in ("-r", "--render"):
-            renderMaps(settings.outputMScriptName)
-            print "-------------------------------------------------------"
-            print "first edit the svg-files if you like (but they will be overwritten after rerun with option -r)"
-            print " -> run this script with option -c to convert to png-files"
-            return
         elif opt in ("-n", "--names"):
             settings.contactNamesToExtract = arg.lower().split(";")
             print settings.contactNamesToExtract
@@ -541,7 +560,7 @@ def main(argv):
     print "-------------------------------------------------------"
     print "edit the osm-files if you like"
     print "see log file for errors"
-    print "-> continue with option -r"
+    print " continue with rendering - see README"
 
 if __name__ == "__main__":
    main(sys.argv[1:])

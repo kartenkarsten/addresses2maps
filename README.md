@@ -30,13 +30,9 @@ If you are familiar with Maperitive you could adjust the template as well to cre
 ## build images
 
 ```
-cd preprocessor
-docker build -t preprocessor .
-cd ../maperitive
-docker build -t maperitive .
-cd ../postprocessor
-docker build -t postprocessor .
-cd ..
+cd preprocessor && docker build -t preprocessor . && cd ..
+cd maperitive && docker build -t maperitive . && cd ..
+cd postprocessor && docker build -t postprocessor . && cd ..
 ```
 
 ## render svg

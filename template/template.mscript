@@ -1,4 +1,5 @@
-clear-map 
+// -----------------------------------------------------------
+clear-map
 
 // map settings
 set-setting name=map.decoration.scale value=false
@@ -7,12 +8,11 @@ set-setting name=map.decoration.grid value=false
 set-geo-bounds $bbox
 set-print-bounds-geo $bbox
 
-// TODO change this path
-use-ruleset location=$rulename
+use-ruleset location="$rulename"
 
 $osmGetDataCommand
 
 apply-ruleset
 zoom-bounds
 
-export-svg compatibility=inkscape file=$outputDir$name.svg
+export-svg compatibility=inkscape file="$outputDir$name.svg"
