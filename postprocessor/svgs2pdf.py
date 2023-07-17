@@ -22,7 +22,9 @@ import sys, getopt
 import os
 #svg post processing
 import pysvg.parser
-from pysvg.builders import ShapeBuilder
+from pysvg.builders import *
+from pysvg.text import *
+from pysvg.style import *
 
 inDir = "./raw_svgs/"
 outDir = "./out/"
@@ -30,7 +32,7 @@ if not os.path.exists(outDir):
     os.makedirs(outDir)
 
 
-def svgAddName(filename, name, outDir):
+def svgAddName(filename, name, idx, outDir):
     svg = pysvg.parser.parse(filename)
     h = float(svg.get_height())
     w = float(svg.get_width())
@@ -39,9 +41,21 @@ def svgAddName(filename, name, outDir):
     leftOffset = 40
     charWidth = 20
     gap = 13
+
     #x1,y1,x2,y2
     for i in range(len(name)):
         svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
+    
+    # Add the id to the top right corner
+    myStyle = StyleBuilder()
+    myStyle.setFontFamily(fontfamily="Times")
+    myStyle.setFontSize('2em')
+    myStyle.setFontStyle('italic')
+    myStyle.setFontWeight('bold')
+    text_element = Text("#"+str(idx), "90%", "10%")
+    text_element.set_style(myStyle.getStyle())
+    svg.addElement(text_element)
+
     svg.save(outDir+name+"_processed.svg")
 
 def convertSvgToPng(filename):
@@ -50,10 +64,19 @@ def convertSvgToPng(filename):
     os.system("inkscape '"+filename+"' --export-type=png -o '"+outfile+".png' -w 1122 -h 531")
 
 def preprocessSvgsInDir(inpath, outpath):
+    # delete id aszioation file
+    if os.path.exists(outDir+"ids.log"):
+        os.remove(outDir+"ids.log")
+
+    idx = 0
     for file in os.listdir(inpath):
         if file.endswith(".svg"):
             filename = inpath+file
-            svgAddName(filename, file.split(".")[0], outpath)
+            name = file.split(".")[0].split("_")[0]
+            idx = idx+1
+            print("extracted name "+name+" from filename ("+file+") as #"+str(idx))
+            open(outDir+"ids.log","a+").write("extracted name "+name+" from filename ("+file+") as #"+str(idx)+"\n")
+            svgAddName(filename, name, idx, outpath)
 
 def convertSvgsInDir(path):
     for file in os.listdir(path):

@@ -38,14 +38,15 @@ cd postprocessor && docker build -t postprocessor . && cd ..
 ## render svg
 
 ```
+WORK_DIR=template
 # parses addresses, looks up geo position if not present, downloads osm files for each address and prepares the maperitiv script (used for svg rendering)
 # expects a mounted folder at /data containing at least 3 files () optinal it could contain cached downloads
 # creates a script for Maperitive at /data/raw_svgs/Contacts.mscript (and referenced osm files)
-docker run --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/template,target=/data preprocessor
+docker run --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/${WORK_DIR},target=/data preprocessor
 
 # executes the rendered maperative script and places creates svgs depending on the provided maperitive script
-docker run -it --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/template,target=/data -v /tmp/.X11-unix:/tmp/.X11-unix -v /run/user/1000/gdm/Xauthority:/root/.Xauthority -e DISPLAY=:0 --network host --privileged maperitive /data/raw_svgs/Contacts.mscript
+docker run -it --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/${WORK_DIR},target=/data -v /tmp/.X11-unix:/tmp/.X11-unix -v /run/user/1000/gdm/Xauthority:/root/.Xauthority -e DISPLAY=:0 --network host --privileged maperitive /data/raw_svgs/Contacts.mscript
 
 # expects /data/
-docker run -it --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/template,target=/data postprocessor
+docker run -it --user "$(id -u):$(id -g)" --mount type=bind,source=$(pwd)/${WORK_DIR},target=/data postprocessor
 ```
