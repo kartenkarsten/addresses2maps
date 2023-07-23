@@ -39,12 +39,14 @@ def svgAddName(filename, name, idx, outDir):
     print("render '"+name+"' to "+filename)
     oh = ShapeBuilder()
     leftOffset = 40
-    charWidth = 20
-    gap = 13
+    charWidth = 20*1.7
+    charheight = charWidth*2.5
+    gap = 13*1.7
 
     #x1,y1,x2,y2
     for i in range(len(name)):
-        svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
+        svg.addElement(oh.createRect(leftOffset+i*(charWidth+gap)-gap/4, h*1/5-(h*1/12), charWidth+gap/2, charheight, strokewidth=1, stroke='black', fill='white'))
+        #svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
     
     # Add the id to the top right corner
     myStyle = StyleBuilder()
@@ -52,7 +54,7 @@ def svgAddName(filename, name, idx, outDir):
     myStyle.setFontSize('2em')
     myStyle.setFontStyle('italic')
     myStyle.setFontWeight('bold')
-    text_element = Text("#"+str(idx), "90%", "10%")
+    text_element = Text("#"+str(idx), w-3*charWidth, 40 )
     text_element.set_style(myStyle.getStyle())
     svg.addElement(text_element)
 
