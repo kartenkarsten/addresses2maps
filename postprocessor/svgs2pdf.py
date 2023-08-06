@@ -26,13 +26,21 @@ from pysvg.builders import *
 from pysvg.text import *
 from pysvg.style import *
 
-inDir = "./raw_svgs/"
-outDir = "./out/"
-if not os.path.exists(outDir):
-    os.makedirs(outDir)
+class Settings:
+    def __init__(self, showNamePlaceholder, showIdx, idxOffset):
+        self.inDir = "./raw_svgs/"
+        self.outDir = "./out/"
+        if not os.path.exists(self.outDir):
+            os.makedirs(self.outDir)
+        self.idxOffset = idxOffset
+        self.showIdx = showIdx
+        self.showNamePlaceholder = showNamePlaceholder
+
+def getSettings():
+    return Settings(True, True, 0)
 
 
-def svgAddName(filename, name, idx, outDir):
+def svgAddName(filename, name, idx, settings):
     svg = pysvg.parser.parse(filename)
     h = float(svg.get_height())
     w = float(svg.get_width())
@@ -43,42 +51,44 @@ def svgAddName(filename, name, idx, outDir):
     charheight = charWidth*2.5
     gap = 13*1.7
 
-    #x1,y1,x2,y2
-    for i in range(len(name)):
-        svg.addElement(oh.createRect(leftOffset+i*(charWidth+gap)-gap/4, h*1/5-(h*1/12), charWidth+gap/2, charheight, strokewidth=1, stroke='black', fill='white'))
-        #svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
+    if settings.showNamePlaceholder:
+        #x1,y1,x2,y2
+        for i in range(len(name)):
+            svg.addElement(oh.createRect(leftOffset+i*(charWidth+gap)-gap/4, h*1/5-(h*1/12), charWidth+gap/2, charheight, strokewidth=1, stroke='black', fill='white'))
+            #svg.addElement(oh.createLine(leftOffset+i*(charWidth+gap), h*1/5, leftOffset+charWidth+i*(charWidth+gap), h*1/5, strokewidth=3, stroke="black"))
     
-    # Add the id to the top right corner
-    myStyle = StyleBuilder()
-    myStyle.setFontFamily(fontfamily="Times")
-    myStyle.setFontSize('2em')
-    myStyle.setFontStyle('italic')
-    myStyle.setFontWeight('bold')
-    text_element = Text("#"+str(idx), w-3*charWidth, 40 )
-    text_element.set_style(myStyle.getStyle())
-    svg.addElement(text_element)
+    if settings.showIdx:
+        # Add the id to the top right corner
+        myStyle = StyleBuilder()
+        myStyle.setFontFamily(fontfamily="Times")
+        myStyle.setFontSize('2em')
+        myStyle.setFontStyle('italic')
+        myStyle.setFontWeight('bold')
+        text_element = Text("#"+str(idx), w-3*charWidth, 40 )
+        text_element.set_style(myStyle.getStyle())
+        svg.addElement(text_element)
 
-    svg.save(outDir+name+"_processed.svg")
+    svg.save(settings.outDir+name+"_processed.svg")
 
 def convertSvgToPng(filename):
     #TODO use filename
     outfile,extension = filename.rsplit(".",1)
     os.system("inkscape '"+filename+"' --export-type=png -o '"+outfile+".png' -w 1122 -h 531")
 
-def preprocessSvgsInDir(inpath, outpath):
+def preprocessSvgsInDir(settings):
     # delete id aszioation file
-    if os.path.exists(outDir+"ids.log"):
-        os.remove(outDir+"ids.log")
+    if os.path.exists(settings.outDir+"ids.log"):
+        os.remove(settings.outDir+"ids.log")
 
-    idx = 0
-    for file in os.listdir(inpath):
+    idx = settings.idxOffset
+    for file in os.listdir(settings.inDir):
         if file.endswith(".svg"):
-            filename = inpath+file
+            filename = settings.inDir+file
             name = file.split(".")[0].split("_")[0]
             idx = idx+1
             print("extracted name "+name+" from filename ("+file+") as #"+str(idx))
-            open(outDir+"ids.log","a+").write("extracted name "+name+" from filename ("+file+") as #"+str(idx)+"\n")
-            svgAddName(filename, name, idx, outpath)
+            open(settings.outDir+"ids.log","a+").write("extracted name "+name+" from filename ("+file+") as #"+str(idx)+"\n")
+            svgAddName(filename, name, idx, settings)
 
 def convertSvgsInDir(path):
     for file in os.listdir(path):
@@ -130,21 +140,43 @@ def convertPnggroupsToPdf(pnggroups, outFile):
 
 
 def usage():
-    print('TODO')
+    print("This are the allowed options:")
+    print('[-h|-?|help|--help] [--hide-idx] [--hide-name-placeholder] [--idx-offset=<a number>]')
+    print("\nby using --idx-offset you can define at what number the index in the map starts to count up.")
 
 
 def main(argv):
+    try:
+        opts, args = getopt.getopt(argv,"h",["help","hide-idx","hide-name-placeholder","idx-offset="])
+    except getopt.GetoptError as err:
+        print(str(err)) # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
 
-    print("convert to png")
-    preprocessSvgsInDir(inDir, outDir)
-    convertSvgsInDir(outDir)
+    settings = getSettings()
+    for opt, arg in opts:
+        if opt in ('-?', "help",'-h', "--help"):
+            usage()
+            sys.exit()
+        elif opt in ("--hide-idx"):
+            settings.showIdx=False
+        elif opt in ("--hide-name-placeholder"):
+            settings.showNamePlaceholder=False
+        elif opt in ("--idx-offset"):
+            settings.idxOffset = int(arg)
+        else:
+            assert False, "unhandled option"
+
+    print("preprocess SVGs")
+    preprocessSvgsInDir(settings)
+    convertSvgsInDir(settings.outDir)
     print("-------------------------------------------------------")
     print("group the png-files and convert them to pdf")
-    workingDir = outDir
+    workingDir = settings.outDir
     print("starting to merge pngs...")
     pnggroups = convertPngsToPnggroups(workingDir)
     print("starting to convert merged pngs to pdf...")
-    outFile = outDir+"mapsToPrint.pdf"
+    outFile = settings.outDir+"mapsToPrint.pdf"
     convertPnggroupsToPdf(pnggroups, outFile)
     rmPnggroups(pnggroups)
 
